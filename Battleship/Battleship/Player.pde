@@ -11,7 +11,7 @@ class Player {
   int lifespan = 0;//how long the player lived for fitness
   int bestScore =0;//stores the score achieved used for replay
   boolean dead;
-  int score = 25*100;
+  int score;
   int gen = 0;
   
   Plan plan;
@@ -54,7 +54,7 @@ class Player {
     if(plan.lastHitShip) {
       vision[i] = 1;
     } else {
-      vision[i] = 0; 
+      vision[i] = -1; 
     }
   }
 
@@ -73,27 +73,21 @@ class Player {
     decision = brain.feedForward(vision);
     
     for (int i = 0; i < decision.length; i++) {
-      if (decision[i] > max) {
+      if (decision[i] > max && !plan.boxes[i].opened) {
         max = decision[i];
         maxIndex = i;
       }
     }
-    boolean successfull = false;
-    while(!successfull) {
-      if(plan.boxes[maxIndex].opened) {
-        maxIndex = floor(random(decision.length));
-        continue;
-      }
-      successfull = true;
-      boolean consecutiveHit = plan.lastHitShip;
-      plan.openBox(maxIndex);
-      if(plan.allBoxesOpened()) {
-        dead = true;
-      }
-      score -= 100;
-      if(plan.lastHitShip && consecutiveHit) {
-        score += 500; 
-      }
+    boolean consecutiveHit = plan.lastHitShip;
+    
+    plan.openBox(maxIndex);
+    if(plan.lastHitShip && consecutiveHit) {
+     score += 200; 
+    }
+    
+    if(plan.allBoxesOpened()) {
+      dead = true;
+      score = (25-plan.moves) * 100;
     }
 
     //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<replace

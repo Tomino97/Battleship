@@ -1,4 +1,4 @@
-class Plan { //<>// //<>// //<>// //<>// //<>//
+class Plan {                                                      //class for the board representation //<>//
   Box[] boxes;
   int shipsAlive;
   int planSize = 5;
@@ -7,7 +7,7 @@ class Plan { //<>// //<>// //<>// //<>// //<>//
   ArrayList<Ship> ships = new ArrayList<Ship>();
   boolean lastHitShip;
 
-  Plan() {
+  Plan() {                                                        //constructor with randomized ships placement
     ships.add(new Ship(3));
     ships.add(new Ship(2));
     boxes = new Box[25];
@@ -19,7 +19,7 @@ class Plan { //<>// //<>// //<>// //<>// //<>//
     randomize();
   }
 
-  Plan(boolean noRandom) {
+  Plan(boolean noRandom) {                                        //constuctor without the random ships placement
     ships.add(new Ship(3));
     ships.add(new Ship(2));
     boxes = new Box[25];
@@ -30,7 +30,7 @@ class Plan { //<>// //<>// //<>// //<>// //<>//
     }
   }
 
-  Plan clone() {
+  Plan clone() {                                                      //copy function
     Plan result = new Plan(true);
     for (int i = 0; i < boxes.length; i++) {
       result.boxes[i] = boxes[i].clone();
@@ -49,13 +49,13 @@ class Plan { //<>// //<>// //<>// //<>// //<>//
     return result;
   }
 
-  void show() {
+  void show() {                                                    //method for the board rendering
     for (int i = 0; i < boxes.length; i++) {
       boxes[i].show();
     }
   }
 
-  void randomize() {
+  void randomize() {                                               //method for random placement of the ships
     IntList freeSpace = new IntList();
     for (int i = 0; i < planSize * planSize; i++) {
       freeSpace.append(i);
@@ -112,7 +112,6 @@ class Plan { //<>// //<>// //<>// //<>// //<>//
     case 3:
       return new PVector(0, -1);
     }
-    println("BAD");
     return new PVector(1, 0);
   }
 
@@ -134,7 +133,7 @@ class Plan { //<>// //<>// //<>// //<>// //<>//
     return new PVector(direction.x * -1, direction.y * -1);
   }
 
-  boolean validShip(PVector indexReal, PVector direction, int length, IntList freeSpace) {
+  boolean validShip(PVector indexReal, PVector direction, int length, IntList freeSpace) {        //check if a ship placement is valid
     PVector index = indexReal.copy();
     for (int i = 0; i < length; i++) {
       if (index.x >= planSize || index.y >= planSize || index.x < 0 || index.y < 0 || !freeSpace.hasValue(getIndex(index))) {
@@ -145,7 +144,7 @@ class Plan { //<>// //<>// //<>// //<>// //<>//
     return true;
   }
 
-  boolean allBoxesOpened() {
+  boolean allBoxesOpened() {                                                                      //game ended function
     for (int i = 0; i < boxes.length; i++) {
       if (!boxes[i].opened) { 
         if (shipsAlive == 0) {

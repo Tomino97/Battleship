@@ -1,4 +1,4 @@
-class Box { //<>//
+class Box {                                                    //class for representation of a single tile //<>//
   PVector index;
   int scheme;
   boolean opened;
@@ -20,7 +20,7 @@ class Box { //<>//
     }
   }
   
-  Box clone() {
+  Box clone() {                                                //copy function
     Box result;
     if(partOf != null) {
       result = new Box(new PVector(index.x, index.y), scheme, partOf.clone()); 
@@ -30,7 +30,7 @@ class Box { //<>//
     return result;
   }
 
-  void show() {
+  void show() {                                                //method for rendering the tile
     if (!opened) {
       fill(255, 255, 255);
       noStroke();
@@ -49,7 +49,7 @@ class Box { //<>//
     }
   }
 
-  boolean openBox() {
+  boolean openBox() {                                        //function for uncovering the tile
     opened = true;
     if(partOf != null) { //<>//
       partOf.open(); 

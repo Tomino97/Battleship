@@ -12,29 +12,40 @@ bool operator!=(const Tile &tile, const Tile &other) {
 }
 
 std::ostream &operator<<(std::ostream &out, const Plan &plan) {
-    out << "\n";
-    for(int i = 0; i < plan.width + 2; i++) {
+    out << "\n" << "  ";
+    for (int i = 1; i <= plan.width; i++) {
+        out << i;
+    }
+    out << "\n" << " ";
+    for (int i = 0; i < plan.width + 2; i++) {
         out << "#";
     }
     out << "\n";
-    for (const std::vector<Tile>& row : plan.grid) {
-        out << '#';
-        for (const Tile& tile : row) {
-            if(!tile.opened) {
-                out << UNKNOWN_CHAR; continue;
+    char tmp = 'A';
+    for (const std::vector<Tile> &row : plan.grid) {
+        out << tmp << '#';
+        tmp++;
+        for (const Tile &tile : row) {
+            if (!tile.opened) {
+                out << UNKNOWN_CHAR;
+                continue;
             }
             switch (tile.type) {
                 case OCEAN:
-                    out << OCEAN_CHAR; break;
+                    out << OCEAN_CHAR;
+                    break;
                 case BOAT:
-                    out << BOAT_CHAR; break;
+                    out << BOAT_CHAR;
+                    break;
                 case UNKNOWN:
-                    out << UNKNOWN_CHAR; break;
+                    out << UNKNOWN_CHAR;
+                    break;
             }
         }
         out << '#' << "\n";
     }
-    for(int i = 0; i < plan.width + 2; i++) {
+    out << " ";
+    for (int i = 0; i < plan.width + 2; i++) {
         out << "#";
     }
     out << "\n";

@@ -1,4 +1,4 @@
-class RandomPlayer {
+class RandomPlayer {                                                  //player that decides randomly
   Plan plan;
   int planSize = 5;
 

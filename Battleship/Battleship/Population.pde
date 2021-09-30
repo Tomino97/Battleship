@@ -85,14 +85,14 @@ class Population {
 
     float averageSum = getAvgFitnessSum();
     ArrayList<Player> children = new ArrayList<Player>();//the next generation
-    println("Species:");               
+    //println("Species:");               
     for (int j = 0; j < species.size(); j++) {//for each species
 
-      println("best unadjusted fitness:", species.get(j).bestFitness);
+      //println("best unadjusted fitness:", species.get(j).bestFitness);
       for (int i = 0; i < species.get(j).players.size(); i++) {
-        print("player " + i, "fitness: " +  species.get(j).players.get(i).fitness, "score " + species.get(j).players.get(i).score, ' ');
+        //print("player " + i, "fitness: " +  species.get(j).players.get(i).fitness, "score " + species.get(j).players.get(i).score, ' ');
       }
-      println();
+      //println();
       children.add(species.get(j).champ.cloneForReplay());//add champion without any mutation
 
       int NoOfChildren = floor(species.get(j).averageFitness/averageSum * pop.size()) -1;//the number of children this species is allowed, note -1 is because the champ is already added

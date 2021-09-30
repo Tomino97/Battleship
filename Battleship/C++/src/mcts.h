@@ -1,6 +1,4 @@
-//
-// Created by Tomi on 28. 2. 2020.
-//
+//The inspiration for a basic layout comes from: https://github.com/PetterS/monte-carlo-tree-search
 
 #ifndef BATTLESHIP_MCTS_H
 #define BATTLESHIP_MCTS_H
@@ -17,170 +15,194 @@
 #include <iostream>
 #include <iomanip>
 #include <utility>
+#include <set>
 
 #include "plan.hpp"
 
-#define DISCOUNT_FACTOR 0.99
 
 namespace MCTS {
+    //class for the current State representation
     class State {
     public:
         Plan board;
-        bool lastHitShip;
         std::vector<std::pair<Coords, bool>> moves;
-        std::vector<std::vector<std::vector<bool>>> possibleStates;
+        std::mt19937_64 engine;
 
-        State() : board{Plan(5, 5, true)}, lastHitShip{false} {
+        //constructor to create (size x size) board with the vector of ships on it
+        State(short size, const std::vector<int> &ships) : board{Plan(size, size, true, ships)} {
             for (const std::vector<Tile> &row : board.grid) {
                 for (const Tile &tile : row) {
-                    moves.emplace_back(tile.coords, true);
-                    moves.emplace_back(tile.coords, false);
+                    moves.emplace_back(Coords(tile.coords.x, tile.coords.y), true);
+                    moves.emplace_back(Coords(tile.coords.x, tile.coords.y), false);
                 }
             }
-            Plan plan(5, 5, false);
-            generateStates(plan, Coords(-1, -1), Plan::resolveDirection(UP));
+            std::random_device device;
+            std::seed_seq seq{std::chrono::high_resolution_clock::now().time_since_epoch().count()};
+            engine.seed(seq);
         }
 
-        void generateStates(Plan plan, Coords coords, const Vector& direction) {
-            if(coords.x != -1 && coords.y != -1 && !plan.ships.empty()) {
-                plan.placeShip(coords, plan.ships[0], direction);
-                plan.ships.erase(plan.ships.begin());
-            }
-            if(plan.ships.empty()) {
-                possibleStates.emplace_back(plan.transform());
-                return;
-            }
-            for(short i = 0; i < board.width; i++) {
-                for(short j = 0; j < board.height; j++) {
-                    if(plan.validShip(i, j, plan.ships[0], RIGHT)) {
-                        generateStates(plan, Coords(i ,j), Plan::resolveDirection(RIGHT));
-                    }
-                    if(plan.validShip(i, j, plan.ships[0], DOWN)) {
-                        generateStates(plan, Coords(i ,j), Plan::resolveDirection(DOWN));
+        //a function that checks the valid layout of ships and returns the number of correct ship tiles
+        int validLayout() const {
+            std::vector<Coords> visitedShips;
+            std::vector<short> ships = board.ships;
+            int uncoveredShips = 0;
+            for (const std::vector<Tile> &row : board.grid) {
+                for (const Tile &tile : row) {
+                    if (tile.opened && tile.type == BOAT &&
+                        std::find(visitedShips.begin(), visitedShips.end(), tile.coords) == visitedShips.end()) {
+                        visitedShips.emplace_back(tile.coords);
+                        bool correct = true;
+                        for (auto dir : {Plan::resolveDirection(DirectionName::RIGHT),
+                                         Plan::resolveDirection(DirectionName::DOWN)}) {
+                            Coords tmp = tile.coords;
+                            short length = 1;
+                            tmp += dir;
+                            while (board.validCoordinates(tmp.x, tmp.y) && board.grid[tmp.x][tmp.y].opened &&
+                                   board.grid[tmp.x][tmp.y].type == BOAT) {
+                                visitedShips.emplace_back(tmp);
+                                length++;
+                                tmp += dir;
+                            }
+                            if (length == 1) {
+                                continue;
+                            }
+                            for (int i = 0; i < length + 2; i++) {
+                                for (int ix : {-1, 1}) {
+                                    if (dir.first == 0) {
+                                        if (board.validCoordinates(static_cast<short>(tmp.x + ix), tmp.y) &&
+                                            board.grid[tmp.x + ix][tmp.y].opened &&
+                                            !board.emptyCoordinates(static_cast<short>(tmp.x + ix), tmp.y)) {
+                                            correct = false;
+                                        }
+                                    } else {
+                                        if (board.validCoordinates(tmp.x, static_cast<short>(tmp.y + ix)) &&
+                                            board.grid[tmp.x][tmp.y + ix].opened &&
+                                            !board.emptyCoordinates(tmp.x, static_cast<short>(tmp.y + ix))) {
+                                            correct = false;
+                                        }
+                                    }
+                                }
+                                tmp -= dir;
+                            }
+                            auto it = std::find(ships.begin(), ships.end(), length);
+                            if (it == ships.end()) {
+                                correct = false;
+                            }
+                            if (!correct) {
+                                break;
+                            }
+                            uncoveredShips += *it;
+                            std::iter_swap(it, ships.end() - 1);
+                            ships.erase(ships.end() - 1);
+                            break;
+                        }
                     }
                 }
             }
+            return uncoveredShips;
         }
 
+        //do a certain move, remove it from the moves vector
         void doMove(const Coords &move) {
-            lastHitShip = board.doMove(move);
+            board.doMove(move);
 
             auto new_end = std::remove_if(moves.begin(), moves.end(),
-                                          [&](std::pair<Coords, bool>& move_)
-                                          { return move_.first == move; });
+                                          [&](std::pair<Coords, bool> &move_) { return move_.first == move; });
             moves.erase(new_end, moves.end());
-
-            auto new_end2 = std::remove_if(possibleStates.begin(), possibleStates.end(),
-                                          [&](const std::vector<std::vector<bool>>& grid)
-                                          { return grid[move.x][move.y] != lastHitShip; });
-
-            possibleStates.erase(new_end2, possibleStates.end());
         }
 
+        //simulate a certain move, throwing away the real content of the tile
         void simulateMove(const std::pair<Coords, bool> &move) {
-            lastHitShip = board.simulateMove(move);
-            /*auto itr = moves.begin();
-            for (; itr != moves.end() && *itr != move; ++itr);
-            assert(itr != moves.end());
-            std::iter_swap(itr, moves.end() - 1);
-            moves.resize(moves.size() - 1);*/
+            board.simulateMove(move);
 
             auto new_end = std::remove_if(moves.begin(), moves.end(),
-                                          [&](std::pair<Coords, bool>& move_)
-                                          { return move_.first == move.first; });
+                                          [&](std::pair<Coords, bool> &move_) { return move_.first == move.first; });
             moves.erase(new_end, moves.end());
-
-            auto new_end2 = std::remove_if(possibleStates.begin(), possibleStates.end(),
-                                          [&](const std::vector<std::vector<bool>>& grid)
-                                          { return grid[move.first.x][move.first.y] != move.second; });
-
-            possibleStates.erase(new_end2, possibleStates.end());
         }
 
-        [[nodiscard]] std::vector<std::pair<Coords, bool>> getMoves() const {
+        std::vector<std::pair<Coords, bool>> getMoves() const {
             return moves;
         }
 
-        bool gameEnded() {
+        //check if the game is finished for a given state
+        bool gameEnded() const {
             return board.gameEnded();
         }
 
-        void doRandomMove() {
-            std::mt19937 generator(
-                    std::chrono::high_resolution_clock::now().time_since_epoch().count()); // seed the generator
-            std::uniform_int_distribution<short> randMove(0, moves.size() - 1);
-            std::pair<Coords, bool> mv = moves[randMove(generator)];
+
+        void simulateRandomMove() {
+            std::uniform_int_distribution<> randMove(0, moves.size() - 1);
+            std::pair<Coords, bool> mv = moves[randMove(engine)];
             simulateMove(mv);
         }
 
-        double getScore() {
-            if(possibleStates.empty()) {
+        double getScore() const {
+            int uncoveredShips = validLayout();
+            /*if(uncoveredShips != board.totalShip()) {         //uncomment to put emphasis on full ship findings
                 return 0;
-            }
-            return board.getScore();
+            }*/
+            return std::pow((double) uncoveredShips / board.totalShip(), 2) * board.getScore();
         }
     };
 
+    //class for a single node in the MCTS tree representation
     class Node {
         std::vector<std::pair<Coords, bool>> moves;
     public:
-        double wins;
+        double payoff;
         double score;
+        int visits;
         std::pair<Coords, bool> move;
         Node *parent;
-        std::vector<Node *> children;
-        int visits;
+        std::vector<std::unique_ptr<Node>> children;
 
-        explicit Node(const State& state): moves(state.getMoves()), wins{0}, score{0}, move{Coords(-1, -1), false}, parent{nullptr}, visits{0} {}
+        //constructor for the root node
+        explicit Node(const State &state) : moves(state.getMoves()), payoff{0}, score{0},
+                                            visits{0}, move{Coords(-1, -1), false}, parent{nullptr} {}
 
-        Node(State& state, std::pair<Coords, bool>  move, Node* parent): moves(state.getMoves()), wins{0}, score{0}, move{std::move(move)}, parent{parent}, visits{0} {}
+        //constructor for the child nodes
+        Node(State &state, std::pair<Coords, bool> move, Node *parent) : moves(state.getMoves()), payoff{0}, score{0},
+                                                                         visits{0}, move{std::move(move)},
+                                                                         parent{parent} {}
 
-        ~Node() {
-            for(auto child : children) {
-                delete child;
-            }
-        }
-
-        [[nodiscard]] std::vector<std::pair<Coords, bool>> getMoves() const {
-            return moves;
-        }
-
-        [[nodiscard]] Node *selectChildUCT() const {
-            for (auto child : children) {
-                child->score = double(child->wins) / double(child->visits) +
+        //UCT calculation of the most promising child
+        Node *selectChildUCT() {
+            for (std::unique_ptr<Node> &child : children) {
+                child->score = double(child->payoff) / double(child->visits) +
                                std::sqrt(2.0 * std::log(double(this->visits)) / child->visits);
             }
 
-            return *std::max_element(children.begin(), children.end(),
-                                     [](Node *a, Node *b) { return a->score <= b->score; });
+            return std::max_element(children.begin(), children.end(),
+                                    [](const std::unique_ptr<Node> &a, const std::unique_ptr<Node> &b) {
+                                        return a->score < b->score;
+                                    })->get();
         }
 
-        [[nodiscard]] bool hasUntriedMove() const {
+        bool hasUntriedMove() const {
             return !moves.empty();
         }
 
-        [[nodiscard]] std::pair<Coords, bool> getRandomMove() const {
-            std::mt19937 generator(
-                    std::chrono::high_resolution_clock::now().time_since_epoch().count()); // seed the generator
-            std::uniform_int_distribution<short> randMove(0, moves.size() - 1);
-            std::pair<Coords, bool> mv = moves[randMove(generator)];
+        std::pair<Coords, bool> getRandomMove(std::mt19937_64 *engine) const {
+            std::uniform_int_distribution<int> randMove(0, moves.size() - 1);
+            std::pair<Coords, bool> mv = moves[randMove(*engine)];
             return mv;
         }
 
+        //add a new child into the tree
         Node *addChild(State &oldState, const std::pair<Coords, bool> &currentMove) {
-            auto node = new Node(oldState, currentMove, this);
-            children.push_back(node);
+            children.push_back(std::make_unique<Node>(oldState, currentMove, this));
             auto itr = moves.begin();
             for (; itr != moves.end() && *itr != currentMove; ++itr);
             assert(itr != moves.end());
             std::iter_swap(itr, moves.end() - 1);
             moves.resize(moves.size() - 1);
-            return node;
+            return children.back().get();
         }
 
+        //update the payoff and number of visits of the node
         void update(double result) {
             visits++;
-            wins+= result;
+            payoff += result;
         }
     };
 
@@ -188,29 +210,31 @@ namespace MCTS {
         auto root = std::make_unique<Node>(initialState);
 
         for (int iter = 1; iter <= maxIterations; ++iter) {
-            int horrizon = 0;
             auto node = root.get();
-            State state = initialState;
+            State state = initialState;                     //copy initial state
 
-            while(!node->hasUntriedMove()) {
+            //SELECTION
+            while (!node->hasUntriedMove() && !node->children.empty()) {
                 node = node->selectChildUCT();
                 state.simulateMove(node->move);
-                horrizon++;
             }
 
-            if (node->hasUntriedMove()) {
-                auto move = node->getRandomMove();
+            //EXPANSION
+            if (node->hasUntriedMove() && !state.gameEnded()) {
+                auto move = node->getRandomMove(&state.engine);
                 state.simulateMove(move);
                 node = node->addChild(state, move);
             }
 
-            while(!state.possibleStates.empty() && !state.gameEnded()) {
-                state.doRandomMove();
-                horrizon++;
+            //SIMULATION
+            while (!state.gameEnded()) {
+                state.simulateRandomMove();
             }
 
-            while(node != nullptr) {
-                node->update(state.getScore() * std::pow(DISCOUNT_FACTOR, horrizon));
+            //BACKPROPAGATION
+            double score = state.getScore();
+            while (node != nullptr) {
+                node->update(score);
                 node = node->parent;
             }
         }
@@ -218,25 +242,30 @@ namespace MCTS {
         return root;
     }
 
-    Coords calculateMove(const State initialState) {
+    Coords calculateMove(const State initialState, int iterationsPerMove) {
         assert(initialState.moves > 0);
-        if(initialState.moves.size() == 1) {
+        if (initialState.moves.size() == 1) {
             return initialState.moves[0].first;
         }
 
-        std::unique_ptr<Node> root = mcts(initialState, 10000);
+        //calculate the tree of moves
+        std::unique_ptr<Node> root = mcts(initialState,
+                                          static_cast<int>(initialState.moves.size()) * iterationsPerMove);
 
+        //remove the missing simulations
         auto new_end = std::remove_if(root->children.begin(), root->children.end(),
-                                      [](Node *a)
-                                      { return !a->move.second; });
+                                      [](std::unique_ptr<Node> &a) { return !a->move.second; });
         root->children.erase(new_end, root->children.end());
 
-        for(auto child : root->children) {
-            std::cout << child->move.first << " " << child->move.second << " " << "WINS: " << child->wins << ", VISITS: " << child->visits << std::endl;
-        }
+        //print of the payoff and visits for all children
+        /*for(const auto& child : root->children) {
+            std::cout << child->move.first << " " << child->move.second << " " << "PAYOFF: " << child->payoff << ", VISITS: " << child->visits << std::endl;
+        }*/
 
-        Node *best = *std::max_element(root->children.begin(), root->children.end(),
-                                 [](Node *a, Node *b) { return a->visits < b->visits; });
+        Node *best = std::max_element(root->children.begin(), root->children.end(),
+                                      [](const std::unique_ptr<Node> &a, const std::unique_ptr<Node> &b) {
+                                          return a->visits < b->visits;
+                                      })->get();
 
         return best->move.first;
     }

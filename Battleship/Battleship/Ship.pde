@@ -1,4 +1,4 @@
-class Ship {
+class Ship {                                                          //class for a single ship representation
   int size;
   ArrayList<Box> boxesNear = new ArrayList<Box>();
   int openedBoxes;
